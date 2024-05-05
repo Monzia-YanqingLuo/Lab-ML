@@ -12,7 +12,7 @@ class PCA:
         X_centered = Xtrain - self.C
         Cov = np.cov(X_centered, rowvar=False)
         eigenvalues, eigenvectors = np.linalg.eigh(Cov)
-        idx = np.argsort(eigenvalues)[::-1]  # sorted is from the smallest to the largest
+        idx = np.argsort(eigenvalues)[::-1]  # sorted is from the largest to the smallest
         sorted_eigenvalues = eigenvalues[idx]
         sorted_eigenvectors = eigenvectors[:, idx]
         self.D = sorted_eigenvalues
@@ -27,51 +27,87 @@ class PCA:
 
 # assignment 2
 
-def gammaidx(X, k):
-    n = X.shape[0]  # Number of data points as shown in Table1
-    D = distance_matrix(X, X)  # Compute the distance matrix
+from scipy.spatial import distance_matrix
+import numpy as np
 
+def gammaidx(X, k):
+    n = X.shape[0]  # Number of data points
+    D = distance_matrix(X, X)  # Compute the distance matrix
+    
     # Initialize the γ-index array
     y = np.zeros(n)
-
+    
     # Iterate over each data point
     for i in range(n):
-        # Find the indices of the k-nearest neighbors (including the point itself)
-        neighbor_ids = np.argsort(D[i])[:k + 1]  # Get the k+1 smallest distances (including itself)
-
+        # Find the indices of the k-nearest neighbors (excluding the point itself)
+        neighbor_ids = np.argsort(D[i])[1:k+1]  # Exclude self in nearest neighbors
+        
         # Retrieve the original points for the k-nearest neighbors
         neighbors = X[neighbor_ids]
-
-        # Project the neighbors: This step involves PCA or any dimensionality reduction method
-        # Here we are assuming a simple mean subtraction is the 'projection'
-        projected_neighbors = neighbors - neighbors.mean(axis=0)
-
-        # Compute the mean Euclidean distance from the point to its projected neighbors
-        y[i] = np.mean(np.linalg.norm(X[i] - projected_neighbors, axis=1))
-
+        
+        # Project the neighbors by subtracting the mean of the neighbors
+        mean_neighbors = neighbors.mean(axis=0)
+        projected_neighbors = neighbors - mean_neighbors
+        
+        # Compute the mean Euclidean distance from the original point to its projected neighbors
+        original_point = X[i] - mean_neighbors  # Also project the original point
+        distances = np.linalg.norm(projected_neighbors - original_point, axis=1)
+        y[i] = distances.mean()
+    
     return y
+
 
 
 # assignment 3
 
 def auc(y_true, y_pred, plot=False):
-    TP = np.sum((y_pred == 1) & (y_true == 1))
-    FP = np.sum((y_pred == 1) & (y_true == -1))
-    TN = np.sum((y_pred == -1) & (y_true == -1))
-    FN = np.sum((y_pred == -1) & (y_true == 1))
-    tpr = TP / (TP + FN) if TP + FP != 0 else 0
-    fpr = FP / (FP + TN) if FP + TN != 0 else 0
-    auc = np.trapz(tpr, fpr)
-    if plot == True:
+    # Sort predictions and corresponding true values
+    order = np.argsort(y_pred)
+    y_true_sorted = y_true[order]
+    y_pred_sorted = y_pred[order]
+    
+    # Create list of thresholds (unique y_pred_sorted values)
+    thresholds = np.unique(y_pred_sorted)[::-1]
+    
+    # Initialize lists to store TPR and FPR
+    tpr_list = [0]
+    fpr_list = [0]
+    
+    # Compute TPR and FPR for each threshold
+    for threshold in thresholds:
+        y_pred_thresholded = (y_pred_sorted >= threshold).astype(int) * 2 - 1  # Convert to {-1, 1}
+        TP = np.sum((y_pred_thresholded == 1) & (y_true_sorted == 1))
+        FP = np.sum((y_pred_thresholded == 1) & (y_true_sorted == -1))
+        TN = np.sum((y_pred_thresholded == -1) & (y_true_sorted == -1))
+        FN = np.sum((y_pred_thresholded == -1) & (y_true_sorted == 1))
+        tpr = TP / (TP + FN) if TP + FN != 0 else 0
+        fpr = FP / (FP + TN) if FP + TN != 0 else 0
+        
+        tpr_list.append(tpr)
+        fpr_list.append(fpr)
+    
+    # Append the end point (1,1) to TPR and FPR lists
+    tpr_list.append(1)
+    fpr_list.append(1)
+    
+    # Convert lists to numpy arrays for calculation
+    tpr_array = np.array(tpr_list)
+    fpr_array = np.array(fpr_list)
+    
+    # Calculate AUC using trapezoidal rule
+    auc_value = np.trapz(tpr_array, fpr_array)
+    
+    if plot:
         plt.figure(figsize=(8, 6))
-        plt.plot(fpr, tpr, label="ROC Curve")
-        plt.xlabel("False positive Rate")
+        plt.plot(fpr_array, tpr_array, label="ROC Curve (AUC = {:.2f})".format(auc_value))
+        plt.plot([0, 1], [0, 1], 'r--')  # Diagonal reference line
+        plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
         plt.title("Receiver Operating Characteristic")
         plt.legend()
         plt.show()
-    else:
-        return auc
+    
+    return auc_value
 
 
 # assignment 4
