@@ -1,4 +1,3 @@
-
 """ ps2_implementation.py
 
 PUT YOUR NAME HERE:
@@ -83,10 +82,38 @@ def kmeans_agglo(X, r):
         Output:
         value: scalar for sum of euclidean distances to cluster centers
         """
+        centroids = np.array([X[r == n].mean(axis=0) for n in np.unique(r)])
+        distances = np.linalg.norm(X[:, np.newaxis] - centroids, axis=2)
 
-        pass
+        return np.sum(np.min(distances, axis=1))
 
-    pass
+    k = len(np.unique(r))
+    R = np.zeros((k - 1, X.shape[0]))
+    mergeidx = np.zeros((k - 1, 2))
+    kmloss = np.zeros(k - 1)
+    kmloss[0] = kmeans_crit(X, r)
+    for i in reversed(range(k - 1)):
+        min_l = None
+        min_r = r
+        min_x = 0
+        min_y = 0
+        for x in np.unique(r):
+            for y in np.unique(r):
+                if x != y:
+                    new_r = r
+                    new_r[new_r == x] = y
+                    new_loss = kmeans_crit(X, new_r)
+                    if min_l is None or min_l > new_loss:
+                        min_l = new_loss
+                        min_r = new_r
+                        min_x = x
+                        min_y = y
+        kmloss[-(i - 1)] = min_l
+        mergeidx[-(i - 1)] = [min_x, min_y]
+        R[-(i - 1)] = min_r
+        r = min_r
+
+    return R, kmloss, mergeidx
 
 
 def agglo_dendro(kmloss, mergeidx):
