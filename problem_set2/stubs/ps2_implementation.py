@@ -18,6 +18,7 @@ Write the functions
 
 from __future__ import division  # always use float division
 import numpy as np
+from scipy.stats import multivariate_normal
 from scipy.spatial.distance import cdist  # fast distance matrices
 from scipy.cluster.hierarchy import dendrogram  # you can use this
 import matplotlib.pyplot as plt
@@ -158,7 +159,93 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
     sigma: list of d x d covariance matrices
     """
 
-    pass
+    def expectation(X, pi, mu, sigma):
+        """
+        Expectation step of the EM algorithm.
+
+        Args:
+          X: The data points.
+          pi: The weights of each Gaussian component.
+          mu: The means of the Gaussian components.
+          sigma: The covariance matrices of the Gaussian components.
+
+        Returns:
+          A matrix containing the responsibilities (posterior probabilities)
+          of each data point belonging to each Gaussian component.
+        """
+        n, d = X.shape
+        K = pi.shape[0]
+        gamma = np.zeros((n, K))
+
+        # Compute the responsibilities for each data point and each component
+        for k in range(K):
+            # Compute the probability density function of the Gaussian component
+            pdf = multivariate_normal(mean=mu[k], cov=sigma[k]).pdf(X)
+            # Compute the weighted probability
+            gamma[:, k] = pi[k] * pdf
+
+        # Normalize the responsibilities to get the posterior probabilities
+        gamma_sum = gamma.sum(axis=1)[:, np.newaxis]
+        gamma = gamma / gamma_sum
+        return gamma
+
+    def maximization(X, gamma):
+        """
+        Maximization step of the EM algorithm.
+
+        Args:
+          X: The data points.
+          gamma: The responsibilities (posterior probabilities)
+               of each data point belonging to each Gaussian component.
+
+        Returns:
+          Updated weights, means, and covariance matrices for the Gaussian components.
+        """
+        n, d = X.shape
+        K = gamma.shape[1]
+
+        # Initialize parameters
+        mu = np.zeros((n, d))
+        sigma = np.zeros((n, d, d))
+
+        # Compute the weighted sum of responsibilities for each component
+        Nk = gamma.sum(axis=0)
+
+        # Update the mixture weights
+        pi = Nk / n
+
+        # Update the means
+        for k in range(K):
+            mu[k, :] = np.sum(gamma[:, k][:, np.newaxis] * X, axis=0) / Nk[k]
+
+        # Update the covariance matrices
+        for k in range(K):
+            diff = X - mu[k]
+            sigma[k] = np.dot(gamma[:, k] * diff.T, diff) / Nk[k]
+        return pi, mu, sigma
+
+    n, d = X.shape
+    if init_kmeans:
+        indices = kmeans(X, k, 100)[1]
+    else:
+        indices = np.random.choice(n, k, replace=False)
+    mu = X[indices]
+
+    # Initialize covariances to identity matrices
+    sigma = [np.eye(d) for _ in range(k)]
+
+    # Initialize weights to be equal
+    pi = np.full(k, 1 / k)
+    log_likelihood = 0
+    for l in range(max_iter):
+        gamma = expectation(X, pi, mu, sigma)
+        prev_log_likelihood = np.sum(np.log(np.dot(gamma, pi.T)))
+        pi, mu, sigma = maximization(X, gamma)
+        log_likelihood = np.sum(np.log(np.dot(gamma, pi.T)))
+        print(f"number of iterations: {l+1}, log likelihood: {log_likelihood}")
+        if abs(log_likelihood - prev_log_likelihood) < eps:
+            break
+    return pi, mu, sigma, log_likelihood
 
 
 def plot_gmm_solution(X, mu, sigma):
