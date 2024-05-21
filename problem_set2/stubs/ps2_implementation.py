@@ -19,6 +19,7 @@ Write the functions
 from __future__ import division  # always use float division
 import numpy as np
 from scipy.stats import multivariate_normal
+from matplotlib.patches import Ellipse
 from scipy.spatial.distance import cdist  # fast distance matrices
 from scipy.cluster.hierarchy import dendrogram  # you can use this
 import matplotlib.pyplot as plt
@@ -173,20 +174,20 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
           A matrix containing the responsibilities (posterior probabilities)
           of each data point belonging to each Gaussian component.
         """
-        n, d = X.shape
-        K = pi.shape[0]
-        gamma = np.zeros((n, K))
+        N, D = X.shape
+        K = len(pi)
 
-        # Compute the responsibilities for each data point and each component
+        # Initialize responsibility matrix
+        gamma = np.zeros((N, K))
+
+        # Compute the responsibility for each data point and component
         for k in range(K):
-            # Compute the probability density function of the Gaussian component
-            pdf = multivariate_normal(mean=mu[k], cov=sigma[k]).pdf(X)
-            # Compute the weighted probability
-            gamma[:, k] = pi[k] * pdf
+            rv = multivariate_normal(mean=mu[k], cov=sigma[k])
+            gamma[:, k] = pi[k] * rv.pdf(X)
 
-        # Normalize the responsibilities to get the posterior probabilities
-        gamma_sum = gamma.sum(axis=1)[:, np.newaxis]
-        gamma = gamma / gamma_sum
+        # Normalize responsibilities to sum to 1 for each data point
+        gamma = gamma / gamma.sum(axis=1, keepdims=True)
+
         return gamma
 
     def maximization(X, gamma):
@@ -201,28 +202,45 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
         Returns:
           Updated weights, means, and covariance matrices for the Gaussian components.
         """
-        n, d = X.shape
+        N, D = X.shape
         K = gamma.shape[1]
 
-        # Initialize parameters
-        mu = np.zeros((n, d))
-        sigma = np.zeros((n, d, d))
-
-        # Compute the weighted sum of responsibilities for each component
+        # Compute the effective number of points assigned to each component
         Nk = gamma.sum(axis=0)
 
         # Update the mixture weights
-        pi = Nk / n
+        pi = Nk / N
 
         # Update the means
-        for k in range(K):
-            mu[k, :] = np.sum(gamma[:, k][:, np.newaxis] * X, axis=0) / Nk[k]
+        mu = (gamma.T @ X) / Nk[:, np.newaxis]
 
         # Update the covariance matrices
+        sigma = np.zeros((K, D, D))
         for k in range(K):
             diff = X - mu[k]
-            sigma[k] = np.dot(gamma[:, k] * diff.T, diff) / Nk[k]
+            weighted_diff = gamma[:, k][:, np.newaxis] * diff
+            sigma[k] = weighted_diff.T @ diff / Nk[k]
+            sigma[k] += 1e-6 * np.eye(D)
+
         return pi, mu, sigma
+
+    def log_likelihood_f(X, pi, mu, sigma):
+
+        N, D = X.shape
+        K = len(pi)
+
+        # Initialize log-likelihood array
+        log_likelihood = np.zeros(N)
+
+        # Compute the log likelihood for each component and each data point
+        for k in range(K):
+            rv = multivariate_normal(mean=mu[k], cov=sigma[k])
+            log_likelihood += pi[k] * rv.pdf(X)
+
+        # Compute the total log likelihood
+        total_log_likelihood = np.sum(np.log(log_likelihood))
+
+        return total_log_likelihood
 
     n, d = X.shape
     if init_kmeans:
@@ -239,9 +257,9 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
     log_likelihood = 0
     for l in range(max_iter):
         gamma = expectation(X, pi, mu, sigma)
-        prev_log_likelihood = np.sum(np.log(np.dot(gamma, pi.T)))
+        prev_log_likelihood = log_likelihood_f(X, pi, mu, sigma)
         pi, mu, sigma = maximization(X, gamma)
-        log_likelihood = np.sum(np.log(np.dot(gamma, pi.T)))
+        log_likelihood = log_likelihood_f(X, pi, mu, sigma)
         print(f"number of iterations: {l+1}, log likelihood: {log_likelihood}")
         if abs(log_likelihood - prev_log_likelihood) < eps:
             break
@@ -257,4 +275,18 @@ def plot_gmm_solution(X, mu, sigma):
     sigma: list of d x d covariance matrices
     """
 
-    pass
+    plt.scatter(X[0], X[1])
+    for k in range(mu.shape[0]):
+        # Plot the means
+        plt.scatter(mu[k, 0], mu[k, 1], marker='x', s=100, label=f'Mean {k + 1}')
+
+        # Plot the covariance as ellipses
+        eigenvalues, eigenvectors = np.linalg.eigh(sigma[k])
+        order = eigenvalues.argsort()[::-1]
+        eigenvalues, eigenvectors = eigenvalues[order], eigenvectors[:, order]
+
+        angle = np.degrees(np.arctan2(*eigenvectors[:, 0][::-1]))
+        width, height = 2 * np.sqrt(eigenvalues)
+
+        ell = Ellipse(xy=mu[k], width=width, height=height, color="red", alpha=0.5)
+        plt.gca().add_patch(ell)
