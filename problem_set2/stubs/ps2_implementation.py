@@ -125,8 +125,20 @@ def agglo_dendro(kmloss, mergeidx):
     kmloss: vector with loss after each step
     mergeidx: (k-1) x 2 matrix that contains merge idx for each step
     """
+    idx = np.array(mergeidx)
+    loss = np.array(kmloss[1:])  # Extract loss values
+    after_idx = np.max(mergeidx, axis=1) + 1
 
-    pass
+    # Combine indices, loss values, and newly formed cluster indices
+    matrix_with_column = np.column_stack((idx, loss.T, after_idx))
+
+    # Plot the dendrogram
+    plt.figure()
+    dn = dendrogram(matrix_with_column)
+    plt.title('Dendrogram')
+    plt.xlabel('Index')
+    plt.ylabel('Distance')
+    plt.show()
 
 
 def norm_pdf(X, mu, C):
@@ -140,8 +152,25 @@ def norm_pdf(X, mu, C):
     Output:
     pdf value for each data point
     """
-
-    pass
+    d = X.shape[1]
+    
+    # Compute the determinant and the inverse of the covariance matrix
+    det_C = np.linalg.det(C)
+    inv_C = np.linalg.inv(C)
+    
+    # compute coefficient
+    coeff = 1 / (np.sqrt((2 * np.pi) ** d * det_C))
+    
+    # compute X_i - mu
+    diff = X - mu
+    
+    # Compute the exponent term for each data point
+    exponent = -0.5 * np.sum(diff @ inv_C * diff, axis=1)
+    
+    # Compute the PDF values
+    pdf_values = coeff * np.exp(exponent)
+    
+    return pdf_values
 
 
 def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
