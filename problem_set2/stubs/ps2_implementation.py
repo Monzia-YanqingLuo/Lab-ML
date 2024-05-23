@@ -266,7 +266,7 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
     return pi, mu, sigma, log_likelihood
 
 
-def plot_gmm_solution(X, mu, sigma):
+def plot_gmm_solution(X, mu, sigma, n_std=1.0):
     """ Plots covariance ellipses for GMM
 
     Input:
@@ -286,7 +286,7 @@ def plot_gmm_solution(X, mu, sigma):
         eigenvalues, eigenvectors = eigenvalues[order], eigenvectors[:, order]
 
         angle = np.degrees(np.arctan2(*eigenvectors[:, 0][::-1]))
-        width, height = 2 * np.sqrt(eigenvalues)
+        width, height = 2 * n_std * np.sqrt(eigenvalues)
 
-        ell = Ellipse(xy=mu[k], width=width, height=height, color="red", alpha=0.5)
+        ell = Ellipse(xy=mu[k], width=width, height=height, angle=angle, color="red", alpha=0.5)
         plt.gca().add_patch(ell)
