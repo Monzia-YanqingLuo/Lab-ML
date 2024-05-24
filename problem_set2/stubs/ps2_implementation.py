@@ -40,17 +40,23 @@ def kmeans(X, k, max_iter=100):
     """
     centroids = X[np.random.choice(range(X.shape[0]), k, replace=False)]
 
-    labels = None
-    loss = 0
+    distances = cdist(X, centroids)
+    labels = np.argmin(distances, axis=1)
+    loss = np.sum(np.min(distances, axis=1))
 
-    for _ in range(max_iter):
+    for i in range(max_iter):
 
-        distances = np.linalg.norm(X[:, np.newaxis] - centroids, axis=2)
-        labels = np.argmin(distances, axis=1)
-
+        old_labels = np.copy(labels)
         new_centroids = np.array([X[labels == i].mean(axis=0) for i in range(k)])
 
+        distances = cdist(X, new_centroids)
+        labels = np.argmin(distances, axis=1)
+
         loss = np.sum(np.min(distances, axis=1))
+
+        n_changed_clusters = np.array(labels == old_labels)
+
+        print(f"number of iterations: {i}, changed clusters: {len(n_changed_clusters[n_changed_clusters == False])} ")
 
         # Check for convergence
         if np.all(centroids == new_centroids):
@@ -102,7 +108,7 @@ def kmeans_agglo(X, r):
         for x in np.unique(r):
             for y in np.unique(r):
                 if x != y:
-                    new_r = r
+                    new_r = np.copy(r)
                     new_r[new_r == x] = y
                     new_loss = kmeans_crit(X, new_r)
                     if min_l is None or min_l > new_loss:
@@ -155,9 +161,16 @@ def norm_pdf(X, mu, C):
     d = X.shape[1]
     
     # Compute the determinant and the inverse of the covariance matrix
-    det_C = np.linalg.det(C)
-    inv_C = np.linalg.inv(C)
-    
+    C += 1e-6 * np.eye(C.shape[0])
+    try:
+        inv_C = np.linalg.inv(C)
+        det_C = np.linalg.det(C)
+    except np.linalg.LinAlgError:
+        # If the matrix is still singular, return a PDF value of zero
+        return 1e-6
+
+    if det_C == 0:
+        return 1e-6
     # compute coefficient
     coeff = 1 / (np.sqrt((2 * np.pi) ** d * det_C))
     
@@ -211,8 +224,8 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
 
         # Compute the responsibility for each data point and component
         for k in range(K):
-            rv = multivariate_normal(mean=mu[k], cov=sigma[k])
-            gamma[:, k] = pi[k] * rv.pdf(X)
+            rv = norm_pdf(X, mu[k], sigma[k])
+            gamma[:, k] = pi[k] * rv
 
         # Normalize responsibilities to sum to 1 for each data point
         gamma = gamma / gamma.sum(axis=1, keepdims=True)
@@ -249,7 +262,6 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
             diff = X - mu[k]
             weighted_diff = gamma[:, k][:, np.newaxis] * diff
             sigma[k] = weighted_diff.T @ diff / Nk[k]
-            sigma[k] += 1e-6 * np.eye(D)
 
         return pi, mu, sigma
 
@@ -263,8 +275,8 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
 
         # Compute the log likelihood for each component and each data point
         for k in range(K):
-            rv = multivariate_normal(mean=mu[k], cov=sigma[k])
-            log_likelihood += pi[k] * rv.pdf(X)
+            rv = norm_pdf(X, mu[k], sigma[k])
+            log_likelihood += pi[k] * rv
 
         # Compute the total log likelihood
         total_log_likelihood = np.sum(np.log(log_likelihood))
@@ -273,13 +285,24 @@ def em_gmm(X, k, max_iter=100, init_kmeans=False, eps=1e-3):
 
     n, d = X.shape
     if init_kmeans:
-        indices = kmeans(X, k, 100)[1]
+        mu, labels, _ = kmeans(X, k, 100)
+        sigma = []
+        for i in range(k):
+            cluster_data = X[labels == i]
+            if len(cluster_data) > 1:
+                cluster_covariance = np.cov(cluster_data, rowvar=False)
+            else:
+                cluster_covariance = np.identity(X.shape[1])  # Handle clusters with a single data point
+            sigma.append(cluster_covariance)
     else:
         indices = np.random.choice(n, k, replace=False)
-    mu = X[indices]
+        mu = X[indices]
+        data_covariance = np.cov(X, rowvar=False)
 
-    # Initialize covariances to identity matrices
-    sigma = [np.eye(d) for _ in range(k)]
+        # Initialize each component's covariance matrix with the overall data covariance matrix
+        sigma = np.array([data_covariance for _ in range(k)])
+
+
 
     # Initialize weights to be equal
     pi = np.full(k, 1 / k)
