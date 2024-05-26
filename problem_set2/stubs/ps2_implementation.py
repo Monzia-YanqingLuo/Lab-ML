@@ -150,7 +150,6 @@ def agglo_dendro(kmloss, mergeidx):
     plt.ylabel('Distance')
     plt.show()
 
-
 def norm_pdf(X, mu, C):
     """ Computes probability density function for multivariate gaussian
 
@@ -164,21 +163,14 @@ def norm_pdf(X, mu, C):
     """
     d = X.shape[1]
     
-    # Compute the determinant and the inverse of the covariance matrix
-    C += 1e-6 * np.eye(C.shape[0])
-    try:
-        inv_C = np.linalg.inv(C)
-        det_C = np.linalg.det(C)
-    except np.linalg.LinAlgError:
-        # If the matrix is still singular, return a PDF value of zero
-        return 1e-6
-
-    if det_C == 0:
-        return 1e-6
-    # compute coefficient
+    # Compute the determinant and the pseudo-inverse of the covariance matrix
+    det_C = np.linalg.det(C)
+    inv_C = np.linalg.pinv(C)
+    
+    # Compute coefficient
     coeff = 1 / (np.sqrt((2 * np.pi) ** d * det_C))
     
-    # compute X_i - mu
+    # Compute X_i - mu
     diff = X - mu
     
     # Compute the exponent term for each data point
