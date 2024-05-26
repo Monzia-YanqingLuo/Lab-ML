@@ -96,9 +96,10 @@ def kmeans_agglo(X, r):
         return np.sum(np.min(distances, axis=1))
 
     k = len(np.unique(r))
+    n = k
     R = np.zeros((k - 1, X.shape[0]))
     mergeidx = np.zeros((k - 1, 2))
-    kmloss = np.zeros(k - 1)
+    kmloss = np.zeros(k)
     kmloss[0] = kmeans_crit(X, r)
     for i in reversed(range(k - 1)):
         min_l = None
@@ -109,17 +110,19 @@ def kmeans_agglo(X, r):
             for y in np.unique(r):
                 if x != y:
                     new_r = np.copy(r)
-                    new_r[new_r == x] = y
+                    new_r[new_r == x] = n
+                    new_r[new_r == y] = n
                     new_loss = kmeans_crit(X, new_r)
                     if min_l is None or min_l > new_loss:
                         min_l = new_loss
-                        min_r = new_r
+                        min_r = np.copy(new_r)
                         min_x = x
                         min_y = y
-        kmloss[-(i - 1)] = min_l
-        mergeidx[-(i - 1)] = [min_x, min_y]
-        R[-(i - 1)] = min_r
+        kmloss[k-i-1] = min_l
+        mergeidx[k-i-2] = [min_x, min_y]
+        R[k-i-2] = min_r
         r = min_r
+        n += 1
 
     return R, kmloss, mergeidx
 
@@ -140,7 +143,8 @@ def agglo_dendro(kmloss, mergeidx):
 
     # Plot the dendrogram
     plt.figure()
-    dn = dendrogram(matrix_with_column)
+    dendrogram(matrix_with_column)
+    plt.ylim(kmloss[0],)
     plt.title('Dendrogram')
     plt.xlabel('Index')
     plt.ylabel('Distance')
