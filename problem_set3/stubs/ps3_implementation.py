@@ -19,6 +19,10 @@ import itertools as it
 import time
 import pylab as pl
 from mpl_toolkits.mplot3d import Axes3D
+import itertools
+from tqdm import tqdm
+import time
+
 
 def zero_one_loss(y_true, y_pred):
     ''' your header here!
@@ -70,11 +74,15 @@ def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetition
     
     # all_param_combinations = list(itertools.product(*parameters.values()))
     
-    all_param_combinations = np.array(list(itertools.product(parameters['alpha'], parameters['kernel'])))
+    all_param_combinations = np.array(list(itertools.product(params['regularization'], params['kernel'])))
+    
+    total_iterations = len(all_param_combinations) * nrepetitions * nfolds
+    iteration = 0
+    start_time = time.time()
 
     for param_combination in all_param_combinations:
-        param_dict = dict(zip(['alpha', 'kernel'], param_combination))
-        param_dict['kernel_params'] = parameters['kernel_params']
+        param_dict = dict(zip(['regularization', 'kernel'], param_combination))
+        param_dict['kernelparameter'] = params['kernelparameter']
 
         total_loss = 0
         
@@ -90,7 +98,15 @@ def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetition
                 
                 fold_loss = loss_function(y_val, y_pred)
                 fold_losses.append(fold_loss)
-            
+
+                # Update iteration and report progress
+                iteration += 1
+                elapsed_time = time.time() - start_time
+                remaining_time = (elapsed_time / iteration) * (total_iterations - iteration)
+                print(f'Progress: {iteration}/{total_iterations} - '
+                      f'Elapsed Time: {elapsed_time:.2f}s - '
+                      f'Remaining Time: {remaining_time:.2f}s', end='\r')
+                
             total_loss += np.mean(fold_losses)
         
         avg_loss = total_loss / nrepetitions
