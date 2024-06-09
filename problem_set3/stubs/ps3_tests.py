@@ -14,7 +14,7 @@ import numpy as np
 import scipy.linalg as la
 import pylab as pl
 
-import sheet3 as imp
+import ps3_implementation as imp
 
 def squared_error_loss(y_true, y_pred):
     ''' returns the squared error loss
