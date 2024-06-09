@@ -20,7 +20,6 @@ import time
 import pylab as pl
 from mpl_toolkits.mplot3d import Axes3D
 
-
 def zero_one_loss(y_true, y_pred):
     ''' your header here!
     '''
@@ -36,6 +35,30 @@ def mean_absolute_error(y_true, y_pred):
         
     return sum(abs(y_true - y_pred)) / len(y_pred)
 
+class KFold:
+    def __init__(self, n_splits=5):
+        self.n_splits = n_splits
+
+    def split(self, X):
+        n_samples = len(X)
+        indices = np.arange(n_samples)
+
+        rng = np.random.default_rng(True)
+        rng.shuffle(indices)
+        
+        fold_sizes = np.full(self.n_splits, n_samples // self.n_splits, dtype=int)
+        fold_sizes[:n_samples % self.n_splits] += 1
+        current = 0
+        splits = []
+        
+        for fold_size in fold_sizes:
+            start, stop = current, current + fold_size
+            test_idx = indices[start:stop]
+            train_idx = np.concatenate((indices[:start], indices[stop:]))
+            splits.append((train_idx, test_idx))
+            current = stop
+        
+        return splits
 
 def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetitions=5):
     ''' your header here!
@@ -43,7 +66,7 @@ def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetition
     best_loss = float('inf')
     best_params = None
     best_model = None
-    kf = KFold(n_splits=nfolds, shuffle=True, random_state=42)
+    kf = KFold(n_splits=nfolds)
     
     # all_param_combinations = list(itertools.product(*parameters.values()))
     
