@@ -64,7 +64,9 @@ class KFold:
         
         return splits
 
-def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetitions=5):
+import itertools
+import numpy as np
+def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepetitions=5):
     ''' your header here!
     '''
     best_loss = float('inf')
@@ -74,15 +76,19 @@ def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetition
     
     # all_param_combinations = list(itertools.product(*parameters.values()))
     
-    all_param_combinations = np.array(list(itertools.product(params['regularization'], params['kernel'])))
+    # all_param_combinations = np.array(list(itertools.product(params['regularization'], params['kernel'])))
+    param_keys = list(params.keys())
+    all_param_combinations = list(itertools.product(*(params[key] for key in param_keys)))
     
     total_iterations = len(all_param_combinations) * nrepetitions * nfolds
     iteration = 0
     start_time = time.time()
 
     for param_combination in all_param_combinations:
-        param_dict = dict(zip(['regularization', 'kernel'], param_combination))
-        param_dict['kernelparameter'] = params['kernelparameter']
+        # param_dict = dict(zip(['regularization', 'kernel'], param_combination))
+        # param_dict['kernelparameter'] = params['kernelparameter']
+        param_dict = dict(zip(param_keys, param_combination))
+
 
         total_loss = 0
         
@@ -119,7 +125,6 @@ def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetition
     
     best_model.cvloss = best_loss
     return best_model
-
   
 class krr():
     ''' Kernel Ridge Regression (KRR) implements ridge regression with various kernel functions.
