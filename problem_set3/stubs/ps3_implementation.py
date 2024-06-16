@@ -40,30 +40,57 @@ def mean_absolute_error(y_true, y_pred):
     return sum(abs(y_true - y_pred)) / len(y_pred)
 
 
-def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepetitions=5):
-    ''' your header here!
-    '''
+def cv(X, y, method, parameters, loss_function=mean_absolute_error, nfolds=10, nrepetitions=5):
+    kf = KFold(n_splits=nfolds, shuffle=True, random_state=42)
+    all_param_combinations = list(itertools.product(*parameters.values()))
+
+    if len(all_param_combinations) == 1:
+        param_dict = dict(zip(parameters.keys(), all_param_combinations[0]))
+        total_loss = 0
+        
+        iteration = 0
+        total_iterations = nrepetitions * nfolds
+        start_time = time.time()
+        
+        for _ in range(nrepetitions):
+            fold_losses = []
+            for train_index, val_index in kf.split(X):
+                X_train, X_val = X[train_index], X[val_index]
+                y_train, y_val = y[train_index], y[val_index]
+                
+                model = method(**param_dict)
+                model.fit(X_train, y_train)
+                y_pred = model.predict(X_val)
+                
+                fold_loss = loss_function(y_val, y_pred)
+                fold_losses.append(fold_loss)
+                
+                # Update iteration and report progress
+                iteration += 1
+                elapsed_time = time.time() - start_time
+                remaining_time = (elapsed_time / iteration) * (total_iterations - iteration)
+                print(f'Progress: {iteration}/{total_iterations} - '
+                      f'Elapsed Time: {elapsed_time:.2f}s - '
+                      f'Remaining Time: {remaining_time:.2f}s', end='\r')
+            
+            total_loss += np.mean(fold_losses)
+        
+        avg_loss = total_loss / nrepetitions
+        
+        best_model = method(**param_dict)
+        best_model.fit(X, y)
+        best_model.cvloss = avg_loss
+        return best_model
+
     best_loss = float('inf')
     best_params = None
     best_model = None
-    kf = KFold(n_splits=nfolds)
-    
-    # all_param_combinations = list(itertools.product(*parameters.values()))
-    
-    # all_param_combinations = np.array(list(itertools.product(params['regularization'], params['kernel'])))
-    param_keys = list(params.keys())
-    all_param_combinations = list(itertools.product(*(params[key] for key in param_keys)))
-    
     total_iterations = len(all_param_combinations) * nrepetitions * nfolds
     iteration = 0
     start_time = time.time()
-
+    
     for param_combination in all_param_combinations:
-        # param_dict = dict(zip(['regularization', 'kernel'], param_combination))
-        # param_dict['kernelparameter'] = params['kernelparameter']
-        param_dict = dict(zip(param_keys, param_combination))
-
-
+        param_dict = dict(zip(parameters.keys(), param_combination))
         total_loss = 0
         
         for _ in range(nrepetitions):
@@ -78,7 +105,7 @@ def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepe
                 
                 fold_loss = loss_function(y_val, y_pred)
                 fold_losses.append(fold_loss)
-
+                
                 # Update iteration and report progress
                 iteration += 1
                 elapsed_time = time.time() - start_time
@@ -86,7 +113,7 @@ def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepe
                 print(f'Progress: {iteration}/{total_iterations} - '
                       f'Elapsed Time: {elapsed_time:.2f}s - '
                       f'Remaining Time: {remaining_time:.2f}s', end='\r')
-                
+            
             total_loss += np.mean(fold_losses)
         
         avg_loss = total_loss / nrepetitions
@@ -99,6 +126,7 @@ def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepe
     
     best_model.cvloss = best_loss
     return best_model
+
 
   
 class krr():
