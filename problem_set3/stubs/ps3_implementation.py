@@ -15,11 +15,12 @@ Write your implementations in the given functions stubs!
 """
 import numpy as np
 import scipy.linalg as la
-import itertools as it
+import itertools
 import time
 import pylab as pl
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.model_selection import KFold
+
 
 
 
@@ -39,21 +40,29 @@ def mean_absolute_error(y_true, y_pred):
     return sum(abs(y_true - y_pred)) / len(y_pred)
 
 
-def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetitions=5):
+def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepetitions=5):
     ''' your header here!
     '''
-    best_loss = float('inf') 
+    best_loss = float('inf')
     best_params = None
     best_model = None
-    kf = KFold(n_splits=nfolds, shuffle=True, random_state=42)
+    kf = KFold(n_splits=nfolds)
     
     # all_param_combinations = list(itertools.product(*parameters.values()))
     
-    all_param_combinations = np.array(list(itertools.product(parameters['alpha'], parameters['kernel'])))
+    # all_param_combinations = np.array(list(itertools.product(params['regularization'], params['kernel'])))
+    param_keys = list(params.keys())
+    all_param_combinations = list(itertools.product(*(params[key] for key in param_keys)))
+    
+    total_iterations = len(all_param_combinations) * nrepetitions * nfolds
+    iteration = 0
+    start_time = time.time()
 
     for param_combination in all_param_combinations:
-        param_dict = dict(zip(['alpha', 'kernel'], param_combination))
-        param_dict['kernel_params'] = parameters['kernel_params']
+        # param_dict = dict(zip(['regularization', 'kernel'], param_combination))
+        # param_dict['kernelparameter'] = params['kernelparameter']
+        param_dict = dict(zip(param_keys, param_combination))
+
 
         total_loss = 0
         
@@ -69,7 +78,15 @@ def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetition
                 
                 fold_loss = loss_function(y_val, y_pred)
                 fold_losses.append(fold_loss)
-            
+
+                # Update iteration and report progress
+                iteration += 1
+                elapsed_time = time.time() - start_time
+                remaining_time = (elapsed_time / iteration) * (total_iterations - iteration)
+                print(f'Progress: {iteration}/{total_iterations} - '
+                      f'Elapsed Time: {elapsed_time:.2f}s - '
+                      f'Remaining Time: {remaining_time:.2f}s', end='\r')
+                
             total_loss += np.mean(fold_losses)
         
         avg_loss = total_loss / nrepetitions
