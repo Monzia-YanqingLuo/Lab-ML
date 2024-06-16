@@ -89,7 +89,6 @@ class krr():
         This class allows specification of the kernel type, kernel parameters, and regularization strength.
     '''
     
-
     def __init__(self, kernel='linear', kernelparameter=1, regularization=0):
         self.kernel = kernel
         self.kernelparameter = kernelparameter
