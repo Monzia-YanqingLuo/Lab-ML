@@ -18,14 +18,12 @@ import itertools
 import numpy as np
 
 
-
-
 def zero_one_loss(y_true, y_pred):
     ''' your header here!
     '''
     if not isinstance(y_true, np.ndarray) and isinstance(y_pred, np.ndarray):
         print(f"Both inputs must be np-array.")
-    return np.sum(y_pred != y_true)/len(y_true)
+    return np.sum(y_pred != y_true) / len(y_true)
 
 
 def mean_absolute_error(y_true, y_pred):
@@ -62,8 +60,6 @@ class KFold:
         return splits
 
 
-def cv(X, y, method, params, loss_function=mean_absolute_error, nfolds=10, nrepetitions=5):
-    best_loss = float('inf')
 def cv(X, y, method, params, loss_function=zero_one_loss, nfolds=10, nrepetitions=5):
     ''' your header here!
     '''
