@@ -16,6 +16,7 @@ Write your implementations in the given functions stubs!
 """
 import scipy.linalg as la
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 import sklearn.svm
 from cvxopt.solvers import qp
 from cvxopt import matrix as cvxmatrix
@@ -37,6 +38,10 @@ class svm_qp():
     def fit(self, X, Y):
 
         # INSERT_CODE
+        n_samples, n_features = X.shape
+
+        # Compute the Kernel matrix
+        K = self.computeKernel(X)
         
         # Here you have to set the matrices as in the general QP problem
         #P = 
@@ -45,6 +50,19 @@ class svm_qp():
         #h = 
         #A =   # hint: this has to be a row vector
         #b =   # hint: this has to be a scalar
+        P = cvxmatrix(np.outer(Y, Y) * K)
+        q = cvxmatrix(-np.ones(n_samples))
+        
+        G_std = np.eye(n_samples) * -1
+        G_slack = np.eye(n_samples)
+        G = cvxmatrix(np.vstack((G_std, G_slack)))
+        
+        h_std = np.zeros(n_samples)
+        h_slack = np.ones(n_samples) * self.C
+        h = cvxmatrix(np.hstack((h_std, h_slack)))
+        
+        A = cvxmatrix(Y, (1, n_samples), 'd')
+        b = cvxmatrix(0.0)
         
         # this is already implemented so you don't have to
         # read throught the cvxopt manual
@@ -56,18 +74,44 @@ class svm_qp():
                             cvxmatrix(b, tc='d'))['x']).flatten()
 
         #b = 
+        # Support vectors have non-zero lagrange multipliers
+        sv = alpha > 1e-5
+        self.alpha_sv = alpha[sv]
+        self.X_sv = X[sv]
+        self.Y_sv = Y[sv]
+        
+        # Intercept
+        self.b = np.mean([self.Y_sv[i] - np.sum(self.alpha_sv * self.Y_sv * K[ind, sv])
+                          for i, ind in enumerate(np.arange(len(alpha))[sv])])
 
     def predict(self, X):
 
-        # INSERT_CODE
-
-        return self
+        if self.alpha_sv is None or self.b is None:
+            raise ValueError("Model is not trained yet. Call `fit` first.")
+        
+        K = self.computeKernel(X, self.X_sv)
+        return np.sign(np.dot(K, self.alpha_sv * self.Y_sv) + self.b)
+    
+    def computeKernel(self, X, Y=None):
+        if Y is None:
+            Y = X
+        if self.kernel == 'linear':
+            return np.dot(X, Y.T)
+        elif self.kernel == 'poly':
+            return (1 + np.dot(X, Y.T)) ** self.kernelparameter
+        elif self.kernel == 'rbf':
+            K = np.zeros((X.shape[0], Y.shape[0]))
+            for i, x in enumerate(X):
+                K[i, :] = np.exp(-np.linalg.norm(x - Y, axis=1) ** 2 / (2 * (self.kernelparameter ** 2)))
+            return K
+        else:
+            raise ValueError(f"Unsupported kernel type: {self.kernel}")
 
 
 # This is already implemented for your convenience
 class svm_sklearn():
     """ SVM via scikit-learn """
-    def __init__(self, kernel='linear', kernelparameter=1., C=1.):
+    def __init__(self, kernel='linear', kernelparameter=1, C=1.):
         if kernel == 'gaussian':
             kernel = 'rbf'
         self.clf = sklearn.svm.SVC(C=C,
@@ -86,8 +130,32 @@ class svm_sklearn():
 
 
 def plot_boundary_2d(X, y, model):
-    # INSERT CODE
-    pass
+    # Create a mesh to plot the decision boundary
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    h = 0.02
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                         np.arange(y_min, y_max, h))
+    
+    # Plot the decision boundary by assigning a color to each point in the mesh
+    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    
+    plt.contourf(xx, yy, Z, alpha=0.8, cmap=ListedColormap(('red', 'blue')))
+    
+    # Plot the training points
+    plt.scatter(X[:, 0], X[:, 1], c=y, cmap=ListedColormap(('red', 'blue')))
+    
+    # Mark the support vectors with a cross
+    if hasattr(model, 'X_sv') and hasattr(model, 'Y_sv'):
+        plt.scatter(model.X_sv[:, 0], model.X_sv[:, 1], 
+                    s=100, facecolors='none', edgecolors='k', marker='x', 
+                    label='Support Vectors')
+    
+    plt.xlim(xx.min(), xx.max())
+    plt.ylim(yy.min(), yy.max())
+    plt.legend()
+    plt.show()
 
 
 def sqdistmat(X, Y=False):
