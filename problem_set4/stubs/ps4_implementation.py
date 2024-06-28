@@ -22,6 +22,10 @@ from cvxopt.solvers import qp
 from cvxopt import matrix as cvxmatrix
 import numpy as np
 import torch
+from torch.optim import SGD
+import torch as tr
+import torch.nn as nn
+import torch.nn.functional as F
 
 class svm_qp():
     """ Support Vector Machines via Quadratic Programming """
@@ -185,36 +189,40 @@ def buildKernel(X, Y=False, kernel='linear', kernelparameter=0):
         raise Exception('unspecified kernel')
     return K
 
-class neural_network(Module):
-    def __init__(self, layers=[2,100,2], scale=.1, p=None, lr=None, lam=None):
+class neural_network(nn.Module):
+    def __init__(self, layers=[2, 100, 2], scale=.1, p=None, lr=None, lam=None):
         super().__init__()
-        self.weights = ParameterList([Parameter(scale*torch.randn(m, n)) for m, n in zip(layers[:-1], layers[1:])])
-        self.biases = ParameterList([Parameter(scale*torch.randn(n)) for n in layers[1:]])
-
+        self.weights = nn.ParameterList([nn.Parameter(scale * tr.randn(m, n)) for m, n in zip(layers[:-1], layers[1:])])
+        self.biases = nn.ParameterList([nn.Parameter(scale * tr.randn(n)) for n in layers[1:]])
+        # self.weights = None
+        # self.biases = None
         self.p = p
         self.lr = lr
         self.lam = lam
-        self.train = False
+        self.train_mode = False
 
     def relu(self, X, W, b):
-        # YOUR CODE HERE!
-        pass
+        return F.relu(X @ W + b)
 
     def softmax(self, X, W, b):
-        # YOUR CODE HERE!
-        pass
+        return F.softmax(X @ W + b, dim=1)
 
     def forward(self, X):
-        X = torch.tensor(X, dtype=torch.float)
-        # YOUR CODE HERE!
+        X = tr.tensor(X, dtype=tr.float)
+        for i in range(len(self.weights) - 1):
+            X = self.relu(X, self.weights[i], self.biases[i])
+            if self.p is not None and self.train_mode:
+                X = F.dropout(X, p=self.p)
+
+        X = self.softmax(X, self.weights[-1], self.biases[-1])
         return X
 
     def predict(self, X):
         return self.forward(X).detach().numpy()
 
     def loss(self, ypred, ytrue):
-        # YOUR CODE HERE!
-        pass
+        ypred = tr.clamp(ypred, 1e-9, 1 - 1e-9)  # To avoid log(0)
+        return -tr.mean(tr.sum(ytrue * tr.log(ypred), dim=1))
 
     def fit(self, X, y, nsteps=1000, bs=100, plot=False):
         X, y = torch.tensor(X), torch.tensor(y)
