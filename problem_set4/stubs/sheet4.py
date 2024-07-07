@@ -134,27 +134,36 @@ class svm_sklearn():
 
 
 def plot_boundary_2d(X, y, model):
-    # Create a mesh to plot the decision boundary
+
     x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
     y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
     h = 0.02
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
                          np.arange(y_min, y_max, h))
+
+    print("Shape of xx:", xx.shape)
+    print("Shape of yy:", yy.shape)
     
-    # Plot the decision boundary by assigning a color to each point in the mesh
-    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
-    Z = Z.reshape(xx.shape)
-    
+    # Prepare to plot the decision boundary
+    grid_points = np.c_[xx.ravel(), yy.ravel()]
+    print("Total points in grid:", grid_points.shape[0])
+
+    Z = model.predict(grid_points)
+    print("Output size of Z before reshape:", Z.size)
+
+    try:
+        Z = Z.reshape(xx.shape)
+    except ValueError as e:
+        print("Error in reshaping Z:", e)
+        return
+
     plt.contourf(xx, yy, Z, alpha=0.8, cmap=ListedColormap(('red', 'blue')))
-    
-    # Plot the training points
-    plt.scatter(X[:, 0], X[:, 1], c=y, cmap=ListedColormap(('red', 'blue')))
-    
-    # Mark the support vectors with a cross
+    plt.scatter(X[:, 0], X[:, 1], c=y, cmap=ListedColormap(('red', 'blue')), label='Data Points')
     if hasattr(model, 'X_sv') and hasattr(model, 'Y_sv'):
         plt.scatter(model.X_sv[:, 0], model.X_sv[:, 1], 
                     s=100, facecolors='none', edgecolors='k', marker='x', 
                     label='Support Vectors')
+    plt.legend()
     
     plt.xlim(xx.min(), xx.max())
     plt.ylim(yy.min(), yy.max())
